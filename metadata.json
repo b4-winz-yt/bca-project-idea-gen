@@ -1,0 +1,5 @@
+{
+  "name": "BCA GenIdeas Pro",
+  "description": "An AI-powered project idea generator for BCA and Computer Science students, offering tailored suggestions, tech stacks, and implementation roadmaps using Gemini 3.",
+  "requestFramePermissions": []
+}
