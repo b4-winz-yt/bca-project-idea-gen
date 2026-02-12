@@ -3,14 +3,21 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { ProjectIdea, Difficulty, Domain } from "../types.ts";
 
 const getApiKey = () => {
-  try {
-    return process.env.API_KEY || '';
-  } catch (e) {
-    return '';
-  }
+  return import.meta.env.VITE_GEMINI_API_KEY || '';
 };
 
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
+let ai: GoogleGenAI | null = null;
+
+const getAIClient = () => {
+  if (!ai) {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+      throw new Error("API Key is missing. Please set VITE_GEMINI_API_KEY in .env.local");
+    }
+    ai = new GoogleGenAI({ apiKey });
+  }
+  return ai;
+};
 
 const PROJECT_SCHEMA = {
   type: Type.OBJECT,
@@ -51,7 +58,7 @@ export async function generateAIProject(level: Difficulty, domain: Domain): Prom
   Make the tech stack appropriate for the ${level} level. 
   For ${level} level, use technologies like ${level === 'beginner' ? 'Basic HTML/CSS/JS or Python Flask' : level === 'intermediate' ? 'MERN Stack, Django, or Flutter' : 'Deep Learning, Blockchain, or Microservices'}.`;
 
-  const response = await ai.models.generateContent({
+  const response = await getAIClient().models.generateContent({
     model: "gemini-3-flash-preview",
     contents: prompt,
     config: {

@@ -1,13 +1,15 @@
 
 import React from 'react';
 import { ProjectIdea } from '../types.ts';
-import { LEVELS } from '../constants.ts';
+import { useToast } from '../context/ToastContext.tsx';
 
 interface ProjectCardProps {
   project: ProjectIdea;
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
+  const { addToast } = useToast();
+
   const copyToClipboard = () => {
     const text = `
 Project Title: ${project.title}
@@ -29,7 +31,7 @@ ${project.roadmap.map(r => `${r.phase}:\n${r.tasks.map(t => `  - ${t}`).join('\n
     `.trim();
     
     navigator.clipboard.writeText(text);
-    alert('Project details copied to clipboard!');
+    addToast('Project details copied to clipboard!', 'success');
   };
 
   const exportAsMarkdown = () => {
