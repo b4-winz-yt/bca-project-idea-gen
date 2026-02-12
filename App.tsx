@@ -5,8 +5,10 @@ import { DOMAINS, LEVELS, STATIC_PROJECTS } from './constants.ts';
 import { generateAIProject } from './services/gemini.ts';
 import Button from './components/Button.tsx';
 import ProjectCard from './components/ProjectCard.tsx';
+import { useToast } from './context/ToastContext.tsx';
 
 const App: React.FC = () => {
+  const { addToast } = useToast();
   const [config, setConfig] = useState<GenerationConfig>({
     level: 'intermediate',
     domain: 'all',
@@ -26,6 +28,12 @@ const App: React.FC = () => {
         console.error("Failed to load history");
       }
     }
+
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      setConfig(prev => ({ ...prev, useAI: false }));
+      // We don't toast here to avoid annoyance on first load, but we disable AI
+    }
   }, []);
 
   useEffect(() => {
@@ -39,6 +47,10 @@ const App: React.FC = () => {
     setError(null);
     try {
       if (config.useAI) {
+        const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+        if (!apiKey) {
+           throw new Error("API Key is missing. Please set VITE_GEMINI_API_KEY in .env.local");
+        }
         const aiProject = await generateAIProject(config.level, config.domain);
         setCurrentProject(aiProject);
         setHistory(prev => [aiProject, ...prev]);
@@ -58,7 +70,9 @@ const App: React.FC = () => {
         setHistory(prev => [clonedProject, ...prev]);
       }
     } catch (err: any) {
-      setError(err.message || 'Something went wrong while generating the idea.');
+      const msg = err.message || 'Something went wrong while generating the idea.';
+      setError(msg);
+      addToast(msg, 'error');
     } finally {
       setIsLoading(false);
     }
@@ -146,8 +160,15 @@ const App: React.FC = () => {
                   </div>
                 </div>
                 <button 
-                  onClick={() => setConfig(prev => ({ ...prev, useAI: !prev.useAI }))}
-                  className={`w-12 h-6 rounded-full transition-colors relative ${config.useAI ? 'bg-blue-600' : 'bg-slate-300'}`}
+                  onClick={() => {
+                     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+                     if (!apiKey) {
+                        addToast("AI features require an API Key. Please configure it in .env.local", "error");
+                        return;
+                     }
+                     setConfig(prev => ({ ...prev, useAI: !prev.useAI }))
+                  }}
+                  className={`w-12 h-6 rounded-full transition-colors relative ${config.useAI ? 'bg-blue-600' : 'bg-slate-300'} ${!import.meta.env.VITE_GEMINI_API_KEY ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${config.useAI ? 'left-7' : 'left-1'}`}></div>
                 </button>
