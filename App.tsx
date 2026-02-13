@@ -168,6 +168,9 @@ const App: React.FC = () => {
                      }
                      setConfig(prev => ({ ...prev, useAI: !prev.useAI }))
                   }}
+                  role="switch"
+                  aria-checked={config.useAI}
+                  aria-label="Enable AI Generation"
                   className={`w-12 h-6 rounded-full transition-colors relative ${config.useAI ? 'bg-blue-600' : 'bg-slate-300'} ${!import.meta.env.VITE_GEMINI_API_KEY ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${config.useAI ? 'left-7' : 'left-1'}`}></div>
