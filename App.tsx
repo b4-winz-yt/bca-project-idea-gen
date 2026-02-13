@@ -3,16 +3,19 @@ import React, { useState, useEffect } from 'react';
 import { Difficulty, Domain, ProjectIdea, GenerationConfig } from './types.ts';
 import { DOMAINS, LEVELS, STATIC_PROJECTS } from './constants.ts';
 import { generateAIProject } from './services/gemini.ts';
+import { generateNvidiaProject } from './services/nvidia.ts';
 import Button from './components/Button.tsx';
 import ProjectCard from './components/ProjectCard.tsx';
 import { useToast } from './context/ToastContext.tsx';
+import { AIProvider } from './types.ts';
 
 const App: React.FC = () => {
   const { addToast } = useToast();
   const [config, setConfig] = useState<GenerationConfig>({
     level: 'intermediate',
     domain: 'all',
-    useAI: true
+    useAI: true,
+    provider: 'gemini'
   });
   const [currentProject, setCurrentProject] = useState<ProjectIdea | null>(null);
   const [history, setHistory] = useState<ProjectIdea[]>([]);
@@ -29,10 +32,14 @@ const App: React.FC = () => {
       }
     }
 
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) {
+    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const nvidiaKey = import.meta.env.VITE_NVIDIA_API_KEY;
+
+    // Prefer NVIDIA if available and Gemini is not, or default to Gemini
+    if (!geminiKey && nvidiaKey) {
+      setConfig(prev => ({ ...prev, provider: 'nvidia' }));
+    } else if (!geminiKey && !nvidiaKey) {
       setConfig(prev => ({ ...prev, useAI: false }));
-      // We don't toast here to avoid annoyance on first load, but we disable AI
     }
   }, []);
 
@@ -47,11 +54,17 @@ const App: React.FC = () => {
     setError(null);
     try {
       if (config.useAI) {
-        const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-        if (!apiKey) {
-           throw new Error("API Key is missing. Please set VITE_GEMINI_API_KEY in .env.local");
+        let aiProject;
+        if (config.provider === 'gemini') {
+          const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+          if (!apiKey) throw new Error("Gemini API Key is missing. Please set VITE_GEMINI_API_KEY in .env.local");
+          aiProject = await generateAIProject(config.level, config.domain);
+        } else {
+          const apiKey = import.meta.env.VITE_NVIDIA_API_KEY;
+          if (!apiKey) throw new Error("NVIDIA API Key is missing. Please set VITE_NVIDIA_API_KEY in .env.local");
+          aiProject = await generateNvidiaProject(config.level, config.domain);
         }
-        const aiProject = await generateAIProject(config.level, config.domain);
+
         setCurrentProject(aiProject);
         setHistory(prev => [aiProject, ...prev]);
       } else {
@@ -149,29 +162,46 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <i className="fas fa-robot text-purple-600"></i>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <i className="fas fa-robot text-purple-600"></i>
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-slate-900">AI Powered</div>
+                      <div className="text-[10px] text-slate-500 uppercase tracking-wide">Dynamic Generation</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-sm font-bold text-slate-900">AI Powered</div>
-                    <div className="text-[10px] text-slate-500 uppercase tracking-wide">Dynamic Generation</div>
-                  </div>
+                  <button
+                    onClick={() => {
+                      const hasKey = config.provider === 'gemini' ? import.meta.env.VITE_GEMINI_API_KEY : import.meta.env.VITE_NVIDIA_API_KEY;
+                      if (!hasKey) {
+                          addToast(`AI features require a ${config.provider === 'gemini' ? 'Gemini' : 'NVIDIA'} API Key.`, "error");
+                          return;
+                      }
+                      setConfig(prev => ({ ...prev, useAI: !prev.useAI }))
+                    }}
+                    className={`w-12 h-6 rounded-full transition-colors relative ${config.useAI ? 'bg-blue-600' : 'bg-slate-300'}`}
+                  >
+                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${config.useAI ? 'left-7' : 'left-1'}`}></div>
+                  </button>
                 </div>
-                <button 
-                  onClick={() => {
-                     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-                     if (!apiKey) {
-                        addToast("AI features require an API Key. Please configure it in .env.local", "error");
-                        return;
-                     }
-                     setConfig(prev => ({ ...prev, useAI: !prev.useAI }))
-                  }}
-                  className={`w-12 h-6 rounded-full transition-colors relative ${config.useAI ? 'bg-blue-600' : 'bg-slate-300'} ${!import.meta.env.VITE_GEMINI_API_KEY ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${config.useAI ? 'left-7' : 'left-1'}`}></div>
-                </button>
+
+                {config.useAI && (
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+                    {(['gemini', 'nvidia'] as AIProvider[]).map(p => (
+                      <button
+                        key={p}
+                        onClick={() => setConfig(prev => ({ ...prev, provider: p }))}
+                        className={`py-2 px-3 rounded-lg text-xs font-bold transition-all capitalize
+                          ${config.provider === p ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        {p === 'nvidia' ? 'NVIDIA (Llama)' : 'Gemini'}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <Button 
@@ -247,7 +277,7 @@ const App: React.FC = () => {
             <i className="fas fa-heart text-red-500"></i>
             <span className="font-bold">CS STUDENTS</span>
           </div>
-          <p className="text-slate-400 text-sm">&copy; 2024 BCA GenIdeas Pro. Powered by Gemini Flash 3.0.</p>
+          <p className="text-slate-400 text-sm">&copy; 2024 BCA GenIdeas Pro. Powered by {config.provider === 'nvidia' ? 'NVIDIA Llama 3.1' : 'Gemini Flash 3.0'}.</p>
         </div>
       </footer>
     </div>

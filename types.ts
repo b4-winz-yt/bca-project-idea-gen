@@ -27,8 +27,11 @@ export interface ProjectIdea {
   timestamp: number;
 }
 
+export type AIProvider = 'gemini' | 'nvidia';
+
 export interface GenerationConfig {
   level: Difficulty;
   domain: Domain;
   useAI: boolean;
+  provider: AIProvider;
 }
